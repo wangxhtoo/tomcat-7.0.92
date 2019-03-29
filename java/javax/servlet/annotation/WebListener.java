@@ -41,13 +41,27 @@ import java.lang.annotation.Target;
  * 
  * @since Servlet 3.0
  */
+
+/**
+ * 用于定义Web应用的各种监听器，使用该注解的类必须继承以下接口中的一个：
+ * {@link javax.servlet.ServletContextListener},
+ * {@link javax.servlet.ServletContextAttributeListener},
+ * {@link javax.servlet.ServletRequestAttributeListener},
+ * {@link javax.servlet.ServletRequestListener},
+ * {@link javax.servlet.http.HttpSessionListener},
+ * {@link javax.servlet.http.HttpSessionAttributeListener},
+ * {@link javax.servlet.http.HttpSessionIdListener}
+ * 
+ * @author wangxh
+ *
+ */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface WebListener {
 
-    /**
-     * @return description of the listener, if present
-     */
-    String value() default "";
+	/**
+	 * @return description of the listener, if present
+	 */
+	String value() default "";
 }

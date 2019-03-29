@@ -35,23 +35,29 @@ import java.lang.annotation.Target;
  * 
  * @since Servlet 3.0
  */
+/**
+ * 用于指定传递到Servlet或Filter的初始化参数，它是WebServlete和WebFilter注解的一个属性
+ * 
+ * @author wangxh
+ *
+ */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface WebInitParam {
 
-    /**
-     * @return name of the initialization parameter
-     */
-    String name();
+	/**
+	 * @return name of the initialization parameter
+	 */
+	String name();
 
-    /**
-     * @return value of the initialization parameter
-     */
-    String value();
+	/**
+	 * @return value of the initialization parameter
+	 */
+	String value();
 
-    /**
-     * @return description of the initialization parameter
-     */
-    String description() default "";
+	/**
+	 * @return description of the initialization parameter
+	 */
+	String description() default "";
 }

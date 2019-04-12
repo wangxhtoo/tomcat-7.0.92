@@ -123,6 +123,9 @@ public abstract class AbstractEndpoint<S> {
 
 	/**
 	 * counter for nr of connections handled by an endpoint
+	 * 
+	 * 连接数控制器
+	 * 
 	 */
 	private volatile LimitLatch connectionLimitLatch = null;
 

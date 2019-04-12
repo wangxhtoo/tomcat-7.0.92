@@ -38,6 +38,19 @@ package org.apache.catalina;
  * If used, an Engine is always the top level Container in a Catalina hierarchy.
  * Therefore, the implementation's <code>setParent()</code> method should throw
  * <code>IllegalArgumentException</code>.
+ * 
+ * 
+ * 全局引擎容器，它的标准实现是StandardEngine
+ * 
+ * 它主要包含的组件有：
+ * 			Host组件	
+ * 			AccessLog组件	
+ * 			Pipeline组件
+ * 			Cluster组件
+ * 			Realm组件
+ * 			LifecycleListener组件
+ * 			Log组件
+ * 
  *
  * @author Craig R. McClanahan
  */

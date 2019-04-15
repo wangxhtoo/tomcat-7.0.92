@@ -20,23 +20,26 @@ import java.lang.reflect.InvocationTargetException;
 
 import javax.naming.NamingException;
 
+/**
+ * 对Context容器中监听器、过滤器以及Servlet等实例的管理
+ * 
+ * @author wangxh
+ *
+ */
 public interface InstanceManager {
 
-    Object newInstance(Class<?> clazz) throws IllegalAccessException, InvocationTargetException,
-            NamingException, InstantiationException, IllegalArgumentException,
-            NoSuchMethodException, SecurityException;
+	Object newInstance(Class<?> clazz) throws IllegalAccessException, InvocationTargetException, NamingException,
+			InstantiationException, IllegalArgumentException, NoSuchMethodException, SecurityException;
 
-    Object newInstance(String className) throws IllegalAccessException, InvocationTargetException,
-            NamingException, InstantiationException, ClassNotFoundException,
-            IllegalArgumentException, NoSuchMethodException, SecurityException;
+	Object newInstance(String className)
+			throws IllegalAccessException, InvocationTargetException, NamingException, InstantiationException,
+			ClassNotFoundException, IllegalArgumentException, NoSuchMethodException, SecurityException;
 
-    Object newInstance(String fqcn, ClassLoader classLoader) throws IllegalAccessException,
-            InvocationTargetException, NamingException, InstantiationException,
-            ClassNotFoundException, IllegalArgumentException, NoSuchMethodException,
-            SecurityException;
+	Object newInstance(String fqcn, ClassLoader classLoader)
+			throws IllegalAccessException, InvocationTargetException, NamingException, InstantiationException,
+			ClassNotFoundException, IllegalArgumentException, NoSuchMethodException, SecurityException;
 
-    void newInstance(Object o)
-            throws IllegalAccessException, InvocationTargetException, NamingException;
+	void newInstance(Object o) throws IllegalAccessException, InvocationTargetException, NamingException;
 
-    void destroyInstance(Object o) throws IllegalAccessException, InvocationTargetException;
+	void destroyInstance(Object o) throws IllegalAccessException, InvocationTargetException;
 }

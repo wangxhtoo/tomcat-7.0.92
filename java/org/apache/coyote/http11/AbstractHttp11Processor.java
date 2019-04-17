@@ -667,7 +667,8 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
 		getOutputBuffer().addFilter(new IdentityOutputFilter());
 
 		// Create and add the chunked filters.
-		getInputBuffer().addFilter(new ChunkedInputFilter(maxTrailerSize, allowedTrailerHeaders, maxExtensionSize, maxSwallowSize));
+		getInputBuffer().addFilter(
+				new ChunkedInputFilter(maxTrailerSize, allowedTrailerHeaders, maxExtensionSize, maxSwallowSize));
 		getOutputBuffer().addFilter(new ChunkedOutputFilter());
 
 		// Create and add the void filters

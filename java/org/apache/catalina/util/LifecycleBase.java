@@ -119,7 +119,7 @@ public abstract class LifecycleBase implements Lifecycle {
 
 			return;
 		}
-
+		// 启动前的生命周期状态验证
 		if (state.equals(LifecycleState.NEW)) {
 			init();
 		} else if (state.equals(LifecycleState.FAILED)) {
@@ -129,7 +129,9 @@ public abstract class LifecycleBase implements Lifecycle {
 		}
 
 		try {
+			// 执行生命周期STARTING_PREP绑定事件
 			setStateInternal(LifecycleState.STARTING_PREP, null, false);
+			// 启动server
 			startInternal();
 			if (state.equals(LifecycleState.FAILED)) {
 				// This is a 'controlled' failure. The component put itself into the

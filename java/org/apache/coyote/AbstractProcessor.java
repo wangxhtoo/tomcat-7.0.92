@@ -38,310 +38,292 @@ import org.apache.tomcat.util.res.StringManager;
  */
 public abstract class AbstractProcessor<S> implements ActionHook, Processor<S> {
 
-    protected static final StringManager sm = StringManager.getManager(Constants.Package);
+	protected static final StringManager sm = StringManager.getManager(Constants.Package);
 
-    // Used to avoid useless B2C conversion on the host name.
-    protected char[] hostNameC = new char[0];
+	// Used to avoid useless B2C conversion on the host name.
+	protected char[] hostNameC = new char[0];
 
-    protected Adapter adapter;
-    protected AsyncStateMachine<S> asyncStateMachine;
-    protected AbstractEndpoint<S> endpoint;
-    protected Request request;
-    protected Response response;
-    protected SocketWrapper<S> socketWrapper = null;
-    private int maxCookieCount = 200;
+	protected Adapter adapter;
+	protected AsyncStateMachine<S> asyncStateMachine;
+	protected AbstractEndpoint<S> endpoint;
+	protected Request request;
+	protected Response response;
+	protected SocketWrapper<S> socketWrapper = null;
+	private int maxCookieCount = 200;
 
+	/**
+	 * Error state for the request/response currently being processed.
+	 */
+	private ErrorState errorState = ErrorState.NONE;
 
-    /**
-     * Error state for the request/response currently being processed.
-     */
-    private ErrorState errorState = ErrorState.NONE;
+	protected final UserDataHelper userDataHelper;
 
-    protected final UserDataHelper userDataHelper;
+	/**
+	 * Intended for use by the Upgrade sub-classes that have no need to initialise
+	 * the request, response, etc.
+	 */
+	protected AbstractProcessor() {
+		// NOOP
+		userDataHelper = null;
+	}
 
-    /**
-     * Intended for use by the Upgrade sub-classes that have no need to
-     * initialise the request, response, etc.
-     */
-    protected AbstractProcessor() {
-        // NOOP
-        userDataHelper = null;
-    }
+	public AbstractProcessor(AbstractEndpoint<S> endpoint) {
+		this.endpoint = endpoint;
+		asyncStateMachine = new AsyncStateMachine<S>(this);
+		request = new Request();
+		response = new Response();
+		response.setHook(this);
+		request.setResponse(response);
+		userDataHelper = new UserDataHelper(getLog());
+	}
 
-    public AbstractProcessor(AbstractEndpoint<S> endpoint) {
-        this.endpoint = endpoint;
-        asyncStateMachine = new AsyncStateMachine<S>(this);
-        request = new Request();
-        response = new Response();
-        response.setHook(this);
-        request.setResponse(response);
-        userDataHelper = new UserDataHelper(getLog());
-    }
+	/**
+	 * Update the current error state to the new error state if the new error state
+	 * is more severe than the current error state.
+	 */
+	protected void setErrorState(ErrorState errorState, Throwable t) {
+		boolean blockIo = this.errorState.isIoAllowed() && !errorState.isIoAllowed();
+		this.errorState = this.errorState.getMostSevere(errorState);
+		// Don't change the status code for IOException since that is almost
+		// certainly a client disconnect in which case it is preferable to keep
+		// the original status code http://markmail.org/message/4cxpwmxhtgnrwh7n
+		if (response.getStatus() < 400 && !(t instanceof IOException)) {
+			response.setStatus(500);
+		}
+		if (t != null) {
+			request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, t);
+		}
+		if (blockIo && !ContainerThreadMarker.isContainerThread() && isAsync()) {
+			// The error occurred on a non-container thread during async
+			// processing which means not all of the necessary clean-up will
+			// have been completed. Dispatch to a container thread to do the
+			// clean-up. Need to do it this way to ensure that all the necessary
+			// clean-up is performed.
+			asyncStateMachine.asyncMustError();
+			if (getLog().isDebugEnabled()) {
+				getLog().debug(sm.getString("abstractProcessor.nonContainerThreadError"), t);
+			}
+			getEndpoint().processSocketAsync(socketWrapper, SocketStatus.ERROR);
+		}
+	}
 
+	protected void resetErrorState() {
+		errorState = ErrorState.NONE;
+	}
 
-    /**
-     * Update the current error state to the new error state if the new error
-     * state is more severe than the current error state.
-     */
-    protected void setErrorState(ErrorState errorState, Throwable t) {
-        boolean blockIo = this.errorState.isIoAllowed() && !errorState.isIoAllowed();
-        this.errorState = this.errorState.getMostSevere(errorState);
-        // Don't change the status code for IOException since that is almost
-        // certainly a client disconnect in which case it is preferable to keep
-        // the original status code http://markmail.org/message/4cxpwmxhtgnrwh7n
-        if (response.getStatus() < 400 && !(t instanceof IOException)) {
-            response.setStatus(500);
-        }
-        if (t != null) {
-            request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, t);
-        }
-        if (blockIo && !ContainerThreadMarker.isContainerThread() && isAsync()) {
-            // The error occurred on a non-container thread during async
-            // processing which means not all of the necessary clean-up will
-            // have been completed. Dispatch to a container thread to do the
-            // clean-up. Need to do it this way to ensure that all the necessary
-            // clean-up is performed.
-            asyncStateMachine.asyncMustError();
-            if (getLog().isDebugEnabled()) {
-                getLog().debug(sm.getString("abstractProcessor.nonContainerThreadError"), t);
-            }
-            getEndpoint().processSocketAsync(socketWrapper, SocketStatus.ERROR);
-        }
-    }
+	protected ErrorState getErrorState() {
+		return errorState;
+	}
 
+	/**
+	 * The endpoint receiving connections that are handled by this processor.
+	 */
+	protected AbstractEndpoint<S> getEndpoint() {
+		return endpoint;
+	}
 
-    protected void resetErrorState() {
-        errorState = ErrorState.NONE;
-    }
+	/**
+	 * The request associated with this processor.
+	 */
+	@Override
+	public Request getRequest() {
+		return request;
+	}
 
+	/**
+	 * Set the associated adapter.
+	 *
+	 * @param adapter the new adapter
+	 */
+	public void setAdapter(Adapter adapter) {
+		this.adapter = adapter;
+	}
 
-    protected ErrorState getErrorState() {
-        return errorState;
-    }
+	/**
+	 * Get the associated adapter.
+	 *
+	 * @return the associated adapter
+	 */
+	public Adapter getAdapter() {
+		return adapter;
+	}
 
-    /**
-     * The endpoint receiving connections that are handled by this processor.
-     */
-    protected AbstractEndpoint<S> getEndpoint() {
-        return endpoint;
-    }
+	/**
+	 * Set the socket wrapper being used.
+	 */
+	protected final void setSocketWrapper(SocketWrapper<S> socketWrapper) {
+		this.socketWrapper = socketWrapper;
+	}
 
+	/**
+	 * Get the socket wrapper being used.
+	 */
+	protected final SocketWrapper<S> getSocketWrapper() {
+		return socketWrapper;
+	}
 
-    /**
-     * The request associated with this processor.
-     */
-    @Override
-    public Request getRequest() {
-        return request;
-    }
+	/**
+	 * Obtain the Executor used by the underlying endpoint.
+	 */
+	@Override
+	public Executor getExecutor() {
+		return endpoint.getExecutor();
+	}
 
+	@Override
+	public boolean isAsync() {
+		return (asyncStateMachine != null && asyncStateMachine.isAsync());
+	}
 
-    /**
-     * Set the associated adapter.
-     *
-     * @param adapter the new adapter
-     */
-    public void setAdapter(Adapter adapter) {
-        this.adapter = adapter;
-    }
+	@Override
+	public SocketState asyncPostProcess() {
+		return asyncStateMachine.asyncPostProcess();
+	}
 
+	@Override
+	public void errorDispatch() {
+		getAdapter().errorDispatch(request, response);
+	}
 
-    /**
-     * Get the associated adapter.
-     *
-     * @return the associated adapter
-     */
-    public Adapter getAdapter() {
-        return adapter;
-    }
+	@Override
+	public abstract boolean isComet();
 
+	protected void parseHost(MessageBytes valueMB) {
+		if (valueMB == null || valueMB.isNull()) {
+			populateHost();
+			populatePort();
+			return;
+		} else if (valueMB.getLength() == 0) {
+			// Empty Host header so set sever name to empty string
+			request.serverName().setString("");
+			populatePort();
+			return;
+		}
 
-    /**
-     * Set the socket wrapper being used.
-     */
-    protected final void setSocketWrapper(SocketWrapper<S> socketWrapper) {
-        this.socketWrapper = socketWrapper;
-    }
+		ByteChunk valueBC = valueMB.getByteChunk();
+		byte[] valueB = valueBC.getBytes();
+		int valueL = valueBC.getLength();
+		int valueS = valueBC.getStart();
+		if (hostNameC.length < valueL) {
+			hostNameC = new char[valueL];
+		}
 
+		try {
+			// Validates the host name
+			int colonPos = Host.parse(valueMB);
 
-    /**
-     * Get the socket wrapper being used.
-     */
-    protected final SocketWrapper<S> getSocketWrapper() {
-        return socketWrapper;
-    }
+			// Extract the port information first, if any
+			if (colonPos != -1) {
+				int port = 0;
+				for (int i = colonPos + 1; i < valueL; i++) {
+					char c = (char) valueB[i + valueS];
+					if (c < '0' || c > '9') {
+						response.setStatus(400);
+						setErrorState(ErrorState.CLOSE_CLEAN, null);
+						return;
+					}
+					port = port * 10 + c - '0';
+				}
+				request.setServerPort(port);
 
+				// Only need to copy the host name up to the :
+				valueL = colonPos;
+			}
 
-    /**
-     * Obtain the Executor used by the underlying endpoint.
-     */
-    @Override
-    public Executor getExecutor() {
-        return endpoint.getExecutor();
-    }
+			// Extract the host name
+			for (int i = 0; i < valueL; i++) {
+				hostNameC[i] = (char) valueB[i + valueS];
+			}
+			request.serverName().setChars(hostNameC, 0, valueL);
 
+		} catch (IllegalArgumentException e) {
+			// IllegalArgumentException indicates that the host name is invalid
+			UserDataHelper.Mode logMode = userDataHelper.getNextMode();
+			if (logMode != null) {
+				String message = sm.getString("abstractProcessor.hostInvalid", valueMB.toString());
+				switch (logMode) {
+				case INFO_THEN_DEBUG:
+					message += sm.getString("abstractProcessor.fallToDebug");
+					//$FALL-THROUGH$
+				case INFO:
+					getLog().info(message, e);
+					break;
+				case DEBUG:
+					getLog().debug(message, e);
+				}
+			}
 
-    @Override
-    public boolean isAsync() {
-        return (asyncStateMachine != null && asyncStateMachine.isAsync());
-    }
+			response.setStatus(400);
+			setErrorState(ErrorState.CLOSE_CLEAN, e);
+		}
+	}
 
+	/**
+	 * Called when a host header is not present in the request (e.g. HTTP/1.0). It
+	 * populates the server name with appropriate information. The source is
+	 * expected to vary by protocol.
+	 * <p>
+	 * The default implementation is a NO-OP.
+	 */
+	protected void populateHost() {
+		// NO-OP
+	}
 
-    @Override
-    public SocketState asyncPostProcess() {
-        return asyncStateMachine.asyncPostProcess();
-    }
+	/**
+	 * Called when a host header is not present or is empty in the request (e.g.
+	 * HTTP/1.0). It populates the server port with appropriate information. The
+	 * source is expected to vary by protocol.
+	 * <p>
+	 * The default implementation is a NO-OP.
+	 */
+	protected void populatePort() {
+		// NO-OP
+	}
 
-    @Override
-    public void errorDispatch() {
-        getAdapter().errorDispatch(request, response);
-    }
+	@Override
+	public abstract boolean isUpgrade();
 
-    @Override
-    public abstract boolean isComet();
+	/**
+	 * Process HTTP requests. All requests are treated as HTTP requests to start
+	 * with although they may change type during processing.
+	 */
+	@Override
+	public abstract SocketState process(SocketWrapper<S> socket) throws IOException;
 
-    protected void parseHost(MessageBytes valueMB) {
-        if (valueMB == null || valueMB.isNull()) {
-            populateHost();
-            populatePort();
-            return;
-        } else if (valueMB.getLength() == 0) {
-            // Empty Host header so set sever name to empty string
-            request.serverName().setString("");
-            populatePort();
-            return;
-        }
+	/**
+	 * Process in-progress Comet requests. These will start as HTTP requests.
+	 */
+	@Override
+	public abstract SocketState event(SocketStatus status) throws IOException;
 
-        ByteChunk valueBC = valueMB.getByteChunk();
-        byte[] valueB = valueBC.getBytes();
-        int valueL = valueBC.getLength();
-        int valueS = valueBC.getStart();
-        if (hostNameC.length < valueL) {
-            hostNameC = new char[valueL];
-        }
+	/**
+	 * Process in-progress Servlet 3.0 Async requests. These will start as HTTP
+	 * requests.
+	 */
+	@Override
+	public abstract SocketState asyncDispatch(SocketStatus status);
 
-        try {
-            // Validates the host name
-            int colonPos = Host.parse(valueMB);
+	/**
+	 * Processes data received on a connection that has been through an HTTP
+	 * upgrade.
+	 */
+	@Override
+	public abstract SocketState upgradeDispatch() throws IOException;
 
-            // Extract the port information first, if any
-            if (colonPos != -1) {
-                int port = 0;
-                for (int i = colonPos + 1; i < valueL; i++) {
-                    char c = (char) valueB[i + valueS];
-                    if (c < '0' || c > '9') {
-                        response.setStatus(400);
-                        setErrorState(ErrorState.CLOSE_CLEAN, null);
-                        return;
-                    }
-                    port = port * 10 + c - '0';
-                }
-                request.setServerPort(port);
+	public int getMaxCookieCount() {
+		return maxCookieCount;
+	}
 
-                // Only need to copy the host name up to the :
-                valueL = colonPos;
-            }
+	public void setMaxCookieCount(int maxCookieCount) {
+		this.maxCookieCount = maxCookieCount;
+	}
 
-            // Extract the host name
-            for (int i = 0; i < valueL; i++) {
-                hostNameC[i] = (char) valueB[i + valueS];
-            }
-            request.serverName().setChars(hostNameC, 0, valueL);
+	/**
+	 * @deprecated Will be removed in Tomcat 8.0.x.
+	 */
+	@Deprecated
+	@Override
+	public abstract org.apache.coyote.http11.upgrade.UpgradeInbound getUpgradeInbound();
 
-        } catch (IllegalArgumentException e) {
-            // IllegalArgumentException indicates that the host name is invalid
-            UserDataHelper.Mode logMode = userDataHelper.getNextMode();
-            if (logMode != null) {
-                String message = sm.getString("abstractProcessor.hostInvalid", valueMB.toString());
-                switch (logMode) {
-                    case INFO_THEN_DEBUG:
-                        message += sm.getString("abstractProcessor.fallToDebug");
-                        //$FALL-THROUGH$
-                    case INFO:
-                        getLog().info(message, e);
-                        break;
-                    case DEBUG:
-                        getLog().debug(message, e);
-                }
-            }
-
-            response.setStatus(400);
-            setErrorState(ErrorState.CLOSE_CLEAN, e);
-        }
-    }
-
-
-    /**
-     * Called when a host header is not present in the request (e.g. HTTP/1.0).
-     * It populates the server name with appropriate information. The source is
-     * expected to vary by protocol.
-     * <p>
-     * The default implementation is a NO-OP.
-     */
-    protected void populateHost() {
-        // NO-OP
-    }
-
-
-    /**
-     * Called when a host header is not present or is empty in the request (e.g.
-     * HTTP/1.0). It populates the server port with appropriate information. The
-     * source is expected to vary by protocol.
-     * <p>
-     * The default implementation is a NO-OP.
-     */
-    protected void populatePort() {
-        // NO-OP
-    }
-
-
-    @Override
-    public abstract boolean isUpgrade();
-
-    /**
-     * Process HTTP requests. All requests are treated as HTTP requests to start
-     * with although they may change type during processing.
-     */
-    @Override
-    public abstract SocketState process(SocketWrapper<S> socket) throws IOException;
-
-    /**
-     * Process in-progress Comet requests. These will start as HTTP requests.
-     */
-    @Override
-    public abstract SocketState event(SocketStatus status) throws IOException;
-
-    /**
-     * Process in-progress Servlet 3.0 Async requests. These will start as HTTP
-     * requests.
-     */
-    @Override
-    public abstract SocketState asyncDispatch(SocketStatus status);
-
-    /**
-     * Processes data received on a connection that has been through an HTTP
-     * upgrade.
-     */
-    @Override
-    public abstract SocketState upgradeDispatch() throws IOException;
-
-
-    public int getMaxCookieCount() {
-        return maxCookieCount;
-    }
-
-
-    public void setMaxCookieCount(int maxCookieCount) {
-        this.maxCookieCount = maxCookieCount;
-    }
-
-
-     /**
-     * @deprecated  Will be removed in Tomcat 8.0.x.
-     */
-    @Deprecated
-    @Override
-    public abstract org.apache.coyote.http11.upgrade.UpgradeInbound getUpgradeInbound();
-
-    protected abstract Log getLog();
+	protected abstract Log getLog();
 }

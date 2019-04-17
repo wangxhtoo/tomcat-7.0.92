@@ -693,13 +693,15 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
 	 */
 	@Override
 	protected void startInternal() throws LifecycleException {
-
+		// 执行生命周期CONFIGURE_START_EVENT的绑定事件
 		fireLifecycleEvent(CONFIGURE_START_EVENT, null);
+		// 更新状态
 		setState(LifecycleState.STARTING);
-
+		// 全局资源命名空间启动
 		globalNamingResources.start();
 
 		// Start our defined Services
+		// 启动服务
 		synchronized (servicesLock) {
 			for (int i = 0; i < services.length; i++) {
 				services[i].start();
@@ -743,6 +745,8 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
 		// Note although the cache is global, if there are multiple Servers
 		// present in the JVM (may happen when embedding) then the same cache
 		// will be registered under multiple names
+		// 注册全局字符串缓存
+		// 注意，尽管字符串缓存是全局的，如果在一个JVM中有多个Server，那么该缓存将被以多个名字进行注册
 		onameStringCache = register(new StringCache(), "type=StringCache");
 
 		// Register the MBeanFactory
@@ -751,6 +755,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
 		onameMBeanFactory = register(factory, "type=MBeanFactory");
 
 		// Register the naming resources
+		// 全局命名空间资源初始化
 		globalNamingResources.init();
 
 		// Populate the extension validator with JARs from common and shared
@@ -781,6 +786,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
 			}
 		}
 		// Initialize our defined Services
+		// 初始化Server的服务
 		for (int i = 0; i < services.length; i++) {
 			services[i].init();
 		}

@@ -54,6 +54,13 @@ import java.io.IOException;
  * 
  * 应用开发的逻辑处理
  * 
+ * Servlet路径的匹配规则： </br>
+ * 首先，尝试使用精确匹配法匹配精确类型Servlet的路径 </br>
+ * 然后，尝试使用前缀匹配通配符类型Servlet </br>
+ * 接着，尝试使用扩展名匹配通配符类型Servlet </br>
+ * 最后，匹配默认Servlet
+ * 
+ * 
  * @see GenericServlet
  * @see javax.servlet.http.HttpServlet
  */

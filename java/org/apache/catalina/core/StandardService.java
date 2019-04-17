@@ -410,12 +410,14 @@ public class StandardService extends LifecycleMBeanBase implements Service {
 		setState(LifecycleState.STARTING);
 
 		// Start our defined Container first
+		// 启动容器
 		if (container != null) {
 			synchronized (container) {
 				container.start();
 			}
 		}
 
+		// 启动线程池
 		synchronized (executors) {
 			for (Executor executor : executors) {
 				executor.start();
@@ -427,6 +429,7 @@ public class StandardService extends LifecycleMBeanBase implements Service {
 			for (Connector connector : connectors) {
 				try {
 					// If it has already failed, don't try and start it
+					// 启动连接器
 					if (connector.getState() != LifecycleState.FAILED) {
 						connector.start();
 					}
@@ -502,7 +505,7 @@ public class StandardService extends LifecycleMBeanBase implements Service {
 	protected void initInternal() throws LifecycleException {
 
 		super.initInternal();
-
+		// 如果容器不为空，初始化容器
 		if (container != null) {
 			container.init();
 		}
@@ -512,13 +515,16 @@ public class StandardService extends LifecycleMBeanBase implements Service {
 			if (executor instanceof LifecycleMBeanBase) {
 				((LifecycleMBeanBase) executor).setDomain(getDomain());
 			}
+			// 线程池初始化
 			executor.init();
 		}
 
 		// Initialize our defined Connectors
+		// 初始化定义的Connector
 		synchronized (connectorsLock) {
 			for (Connector connector : connectors) {
 				try {
+					// 调用AbstractProtocol的init方法，并初始化其中的组件
 					connector.init();
 				} catch (Exception e) {
 					String message = sm.getString("standardService.connector.initFailed", connector);

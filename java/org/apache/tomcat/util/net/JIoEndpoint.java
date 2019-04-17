@@ -78,6 +78,9 @@ public class JIoEndpoint extends AbstractEndpoint<Socket> {
 
 	/**
 	 * Handling of accepted sockets.
+	 * 
+	 * 默认情况下处理器为Http11ConnectionHandler
+	 * 
 	 */
 	protected Handler handler = null;
 
@@ -205,15 +208,11 @@ public class JIoEndpoint extends AbstractEndpoint<Socket> {
 	 * them off to an appropriate processor.
 	 */
 	protected class Acceptor extends AbstractEndpoint.Acceptor {
-
 		@Override
 		public void run() {
-
 			int errorDelay = 0;
-
 			// Loop until we receive a shutdown command
 			while (running) {
-
 				// Loop if endpoint is paused
 				while (paused && running) {
 					state = AcceptorState.PAUSED;
@@ -223,12 +222,10 @@ public class JIoEndpoint extends AbstractEndpoint<Socket> {
 						// Ignore
 					}
 				}
-
 				if (!running) {
 					break;
 				}
 				state = AcceptorState.RUNNING;
-
 				try {
 					// if we have reached max connections, wait
 					countUpOrAwaitConnection();
@@ -314,7 +311,6 @@ public class JIoEndpoint extends AbstractEndpoint<Socket> {
 			synchronized (socket) {
 				try {
 					SocketState state = SocketState.OPEN;
-
 					try {
 						// SSL handshake
 						serverSocketFactory.handshake(socket.getSocket());
@@ -433,12 +429,13 @@ public class JIoEndpoint extends AbstractEndpoint<Socket> {
 			paused = false;
 
 			// Create worker collection
+			// 创建工作线程池
 			if (getExecutor() == null) {
 				createExecutor();
 			}
-
+			// 初始化线程池限制
 			initializeConnectionLatch();
-
+			// 启动接收线程池接收请求
 			startAcceptorThreads();
 
 			// Start async timeout thread

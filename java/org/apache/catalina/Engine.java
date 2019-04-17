@@ -42,14 +42,8 @@ package org.apache.catalina;
  * 
  * 全局引擎容器，它的标准实现是StandardEngine
  * 
- * 它主要包含的组件有：
- * 			Host组件	
- * 			AccessLog组件	
- * 			Pipeline组件
- * 			Cluster组件
- * 			Realm组件
- * 			LifecycleListener组件
- * 			Log组件
+ * 它主要包含的组件有： Host组件 AccessLog组件 Pipeline组件 Cluster组件 Realm组件
+ * LifecycleListener组件 Log组件
  * 
  *
  * @author Craig R. McClanahan
